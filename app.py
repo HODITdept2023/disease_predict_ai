@@ -10,7 +10,15 @@ import seaborn as sns
 
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import LabelEncoder, label_binarize
-from sklearn.metrics import accuracy_score, confusion_matrix, roc_curve, auc
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    roc_curve,
+    auc,
+    precision_score,
+    recall_score,
+    f1_score
+)
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
@@ -21,7 +29,6 @@ from sklearn.svm import SVC
 
 def login():
     st.title("🔐 Medical AI Login")
-
     username = st.text_input("User ID")
     password = st.text_input("Password", type="password")
 
@@ -43,8 +50,12 @@ if not st.session_state["authenticated"]:
 # ----------------------------------------------------------
 
 st.title("🩺 Multi-Disease Diagnostic System (M.Tech Project)")
+st.markdown("---")
 
-# Load dataset
+# ----------------------------------------------------------
+# LOAD DATA
+# ----------------------------------------------------------
+
 @st.cache_data
 def load_data():
     return pd.read_csv("mtech_disease_dataset_5000.csv")
@@ -61,34 +72,51 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y_encoded, test_size=0.2, random_state=42
 )
 
-# Initialize Models
+# ----------------------------------------------------------
+# INITIALIZE MODELS
+# ----------------------------------------------------------
+
 models = {
     "Decision Tree": DecisionTreeClassifier(),
     "Random Forest": RandomForestClassifier(n_estimators=200),
     "SVM": SVC(kernel='linear', probability=True)
 }
 
-# Train Models
 for model in models.values():
     model.fit(X_train, y_train)
 
 # ----------------------------------------------------------
-# SYMPTOM DROPDOWN SECTION
+# SYMPTOM INPUT SECTION
 # ----------------------------------------------------------
 
 st.header("📝 Enter Patient Symptoms")
 
 symptom_list = sorted(list(X.columns))
 
-symptom1 = st.selectbox("Symptom 1", [""] + symptom_list)
-symptom2 = st.selectbox("Symptom 2", [""] + symptom_list)
-symptom3 = st.selectbox("Symptom 3", [""] + symptom_list)
-symptom4 = st.selectbox("Symptom 4", [""] + symptom_list)
-symptom5 = st.selectbox("Symptom 5", [""] + symptom_list)
+col1, col2 = st.columns(2)
 
-if st.button("Predict Disease"):
+with col1:
+    symptom1 = st.selectbox("Symptom 1", [""] + symptom_list)
+    symptom2 = st.selectbox("Symptom 2", [""] + symptom_list)
+    symptom3 = st.selectbox("Symptom 3", [""] + symptom_list)
 
-    selected_symptoms = [s for s in [symptom1, symptom2, symptom3, symptom4, symptom5] if s != ""]
+with col2:
+    symptom4 = st.selectbox("Symptom 4", [""] + symptom_list)
+    symptom5 = st.selectbox("Symptom 5", [""] + symptom_list)
+
+# ----------------------------------------------------------
+# PREDICTION BUTTON
+# ----------------------------------------------------------
+
+if st.button("🔍 Predict Disease"):
+
+    selected_symptoms = [
+        s for s in [symptom1, symptom2, symptom3, symptom4, symptom5] if s != ""
+    ]
+
+    if len(selected_symptoms) == 0:
+        st.warning("Please select at least one symptom.")
+        st.stop()
 
     input_vector = [0] * len(X.columns)
 
@@ -98,34 +126,63 @@ if st.button("Predict Disease"):
 
     input_array = np.array([input_vector])
 
-    st.subheader("🔍 Prediction Results")
+    st.subheader("🧾 Prediction Results")
 
     for name, model in models.items():
         pred = model.predict(input_array)
         disease_name = le.inverse_transform(pred)
-        st.write(f"**{name} predicts:** {disease_name[0]}")
+        st.success(f"{name} predicts: {disease_name[0]}")
 
     # ------------------------------------------------------
     # MODEL PERFORMANCE
     # ------------------------------------------------------
 
-    st.subheader("📊 Model Performance")
+    st.markdown("---")
+    st.subheader("📊 Model Performance Evaluation")
 
-    results = {}
+    metrics_data = []
+    accuracy_results = {}
 
     for name, model in models.items():
-        y_pred = model.predict(X_test)
-        acc = accuracy_score(y_test, y_pred)
-        results[name] = acc
 
-    # Accuracy Bar Chart
+        y_pred = model.predict(X_test)
+
+        acc = accuracy_score(y_test, y_pred)
+        cv = cross_val_score(model, X_train, y_train, cv=5).mean()
+        prec = precision_score(y_test, y_pred, average='weighted')
+        rec = recall_score(y_test, y_pred, average='weighted')
+        f1 = f1_score(y_test, y_pred, average='weighted')
+
+        accuracy_results[name] = acc
+
+        metrics_data.append({
+            "Model": name,
+            "Accuracy": round(acc, 4),
+            "Cross Validation": round(cv, 4),
+            "Precision": round(prec, 4),
+            "Recall": round(rec, 4),
+            "F1 Score": round(f1, 4)
+        })
+
+    metrics_df = pd.DataFrame(metrics_data)
+    st.dataframe(metrics_df, use_container_width=True)
+
+    # ------------------------------------------------------
+    # ACCURACY GRAPH
+    # ------------------------------------------------------
+
     fig1, ax1 = plt.subplots()
-    ax1.bar(results.keys(), results.values())
+    ax1.bar(accuracy_results.keys(), accuracy_results.values())
     ax1.set_ylabel("Accuracy")
     ax1.set_title("Model Accuracy Comparison")
     st.pyplot(fig1)
 
-    # Confusion Matrix (Random Forest)
+    # ------------------------------------------------------
+    # CONFUSION MATRIX (Random Forest)
+    # ------------------------------------------------------
+
+    st.subheader("📌 Confusion Matrix (Random Forest)")
+
     best_model = models["Random Forest"]
     y_pred_best = best_model.predict(X_test)
 
@@ -133,12 +190,17 @@ if st.button("Predict Disease"):
 
     fig2, ax2 = plt.subplots(figsize=(6,5))
     sns.heatmap(cm, cmap="Blues", ax=ax2)
-    ax2.set_title("Confusion Matrix - Random Forest")
+    ax2.set_title("Confusion Matrix")
     ax2.set_xlabel("Predicted")
     ax2.set_ylabel("Actual")
     st.pyplot(fig2)
 
-    # ROC Curve
+    # ------------------------------------------------------
+    # ROC CURVE
+    # ------------------------------------------------------
+
+    st.subheader("📈 Multi-Class ROC Curve (Random Forest)")
+
     y_test_bin = label_binarize(y_test, classes=np.unique(y_encoded))
     y_score = best_model.predict_proba(X_test)
 
@@ -150,9 +212,9 @@ if st.button("Predict Disease"):
         ax3.plot(fpr, tpr, label=f"Class {i} (AUC={roc_auc:.2f})")
 
     ax3.plot([0,1],[0,1],'--')
-    ax3.set_title("Multi-Class ROC Curve")
     ax3.set_xlabel("False Positive Rate")
     ax3.set_ylabel("True Positive Rate")
+    ax3.set_title("ROC Curve")
     ax3.legend(fontsize=6)
 
     st.pyplot(fig3)
