@@ -24,25 +24,55 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 
 # ----------------------------------------------------------
-# LOGIN SYSTEM
+# MEDICAL THEME LOGIN PAGE
 # ----------------------------------------------------------
 
-def login():
-    st.title("🔐 Medical AI Login")
+def medical_login():
+
+    st.markdown("""
+        <style>
+        .stApp {
+            background: linear-gradient(to right, #e6f2ff, #f9fcff);
+        }
+        .login-card {
+            background-color: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 20px rgba(0,0,0,0.1);
+            width: 400px;
+            margin: auto;
+            margin-top: 100px;
+        }
+        .title {
+            text-align: center;
+            font-size: 26px;
+            font-weight: bold;
+            color: #0b6fa4;
+            margin-bottom: 20px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="login-card">', unsafe_allow_html=True)
+    st.markdown('<div class="title">🩺 AI Medical Diagnostic System</div>', unsafe_allow_html=True)
+
     username = st.text_input("User ID")
     password = st.text_input("Password", type="password")
 
-    if st.button("Login"):
+    if st.button("🔐 Secure Login"):
         if username == "admin" and password == "csdmed2026ai":
             st.session_state["authenticated"] = True
         else:
             st.error("Invalid Credentials")
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Session handling
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 if not st.session_state["authenticated"]:
-    login()
+    medical_login()
     st.stop()
 
 # ----------------------------------------------------------
@@ -105,7 +135,7 @@ with col2:
     symptom5 = st.selectbox("Symptom 5", [""] + symptom_list)
 
 # ----------------------------------------------------------
-# PREDICTION BUTTON
+# PREDICTION
 # ----------------------------------------------------------
 
 if st.button("🔍 Predict Disease"):
@@ -167,20 +197,14 @@ if st.button("🔍 Predict Disease"):
     metrics_df = pd.DataFrame(metrics_data)
     st.dataframe(metrics_df, use_container_width=True)
 
-    # ------------------------------------------------------
-    # ACCURACY GRAPH
-    # ------------------------------------------------------
-
+    # Accuracy Graph
     fig1, ax1 = plt.subplots()
     ax1.bar(accuracy_results.keys(), accuracy_results.values())
     ax1.set_ylabel("Accuracy")
     ax1.set_title("Model Accuracy Comparison")
     st.pyplot(fig1)
 
-    # ------------------------------------------------------
-    # CONFUSION MATRIX (Random Forest)
-    # ------------------------------------------------------
-
+    # Confusion Matrix
     st.subheader("📌 Confusion Matrix (Random Forest)")
 
     best_model = models["Random Forest"]
@@ -195,10 +219,7 @@ if st.button("🔍 Predict Disease"):
     ax2.set_ylabel("Actual")
     st.pyplot(fig2)
 
-    # ------------------------------------------------------
-    # ROC CURVE
-    # ------------------------------------------------------
-
+    # ROC Curve
     st.subheader("📈 Multi-Class ROC Curve (Random Forest)")
 
     y_test_bin = label_binarize(y_test, classes=np.unique(y_encoded))
